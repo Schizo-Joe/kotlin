@@ -35,10 +35,14 @@ open class KotlinWebpack
 @Inject
 constructor(
     @Internal
+    @Transient
     override val compilation: KotlinJsCompilation
 ) : DefaultTask(), RequiresNpmDependencies {
+    @Transient
     private val nodeJs = NodeJsRootPlugin.apply(project.rootProject)
     private val versions = nodeJs.versions
+
+    private val isContinuous = project.gradle.startParameter.isContinuous
 
     @get:Inject
     open val fileResolver: FileResolver
@@ -103,14 +107,14 @@ constructor(
         get() = destinationDirectory
 
     private val baseConventions: BasePluginConvention?
-        get() = project.convention.plugins["base"] as BasePluginConvention?
+        get() = convention.plugins["base"] as BasePluginConvention?
 
     @get:Internal
     internal var _destinationDirectory: File? = null
 
     @get:Internal
     var destinationDirectory: File
-        get() = _destinationDirectory ?: project.buildDir.resolve(baseConventions!!.distsDirName)
+        get() = _destinationDirectory ?: buildDir.resolve(baseConventions!!.distsDirName)
         set(value) {
             _destinationDirectory = value
         }
@@ -120,12 +124,21 @@ constructor(
         baseConventions?.archivesBaseName + ".js"
     }
 
+    @get:Internal
+    internal val projectDir = project.projectDir
+
+    @get:Internal
+    internal val reportsDir = project.reportsDir
+
+    @get:Internal
+    internal val buildDir = project.buildDir
+
     @get:OutputFile
     open val outputFile: File
         get() = destinationDirectory.resolve(outputFileName)
 
     open val configDirectory: File?
-        @Optional @InputDirectory get() = project.projectDir.resolve("webpack.config.d").takeIf { it.isDirectory }
+        @Optional @InputDirectory get() = projectDir.resolve("webpack.config.d").takeIf { it.isDirectory }
 
     @Input
     var report: Boolean = false
@@ -137,7 +150,7 @@ constructor(
         @OutputDirectory get() = entryProperty
             .map { it.asFile.nameWithoutExtension }
             .map {
-                project.reportsDir.resolve("webpack").resolve(it)
+                reportsDir.resolve("webpack").resolve(it)
             }
 
     open val evaluatedConfigFile: File
@@ -224,13 +237,11 @@ constructor(
             return
         }
 
-        if (project.gradle.startParameter.isContinuous) {
-            val continuousRunner = runner
-
+        if (isContinuous) {
             val deploymentRegistry = services.get(DeploymentRegistry::class.java)
             val deploymentHandle = deploymentRegistry.get("webpack", Handle::class.java)
             if (deploymentHandle == null) {
-                deploymentRegistry.start("webpack", DeploymentRegistry.ChangeBehavior.BLOCK, Handle::class.java, continuousRunner)
+                deploymentRegistry.start("webpack", DeploymentRegistry.ChangeBehavior.BLOCK, Handle::class.java, runner)
             }
         } else {
             runner.copy(

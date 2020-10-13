@@ -89,12 +89,12 @@ internal fun runToolInSeparateProcess(
     compilerClassName: String,
     classpath: List<File>,
     logger: KotlinLogger,
-    buildDir: File
+    temporaryDir: File
 ): ExitCode {
     val javaBin = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java"
     val classpathString = classpath.map { it.absolutePath }.joinToString(separator = File.pathSeparator)
 
-    val compilerOptions = writeArgumentsToFile(buildDir, argsArray)
+    val compilerOptions = writeArgumentsToFile(temporaryDir, argsArray)
 
     val builder = ProcessBuilder(javaBin, "-cp", classpathString, compilerClassName, "@${compilerOptions.absolutePath}")
     val messageCollector = createLoggingMessageCollector(logger)
